@@ -2,7 +2,6 @@
 # python lib to read/write PLC FX series from programmer port
 # 
 # Copyright by Aixi Wang (aixi.wang@hotmail.com)
-# Contact me for commercial application
 #---------------------------------------------------------------------------------------------
 import serial
 import sys,time
