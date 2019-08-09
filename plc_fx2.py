@@ -11,6 +11,7 @@ CMD_ACK = 0x06
 CMD_NAK = 0x15
 CMD_STX = 0x02
 CMD_ETX = 0x03
+
 #-------------------------------
 # encode_device_read_pkg
 #   offset: PLC data offset
@@ -65,6 +66,119 @@ def encode_device_read_pkg(offset,lens,debug = 0):
 
     return 0,s1
 
+#-------------------------------
+# mypad
+#-------------------------------
+def mypad(s,n):
+    i = len(s)
+    if i >= n:
+        return s
+    else:
+        return '0' * (n - i) + s
+        
+#-------------------------------
+# encode_device_write_pkg
+#   offset: PLC data offset
+#   lens: bytes
+#   debug: debug flag
+#------------------------------- 
+def encode_device_write_pkg(offset,lens,dat,debug = 0):
+    if offset > 65535:
+        return -1,''
+    if lens > 64:
+        return -2,''
+       
+    s1 = '\x02\x31'
+    
+    # add offset string
+    s2 = hex(offset).lstrip('0x').upper()
+    
+    # padding
+    s2 = mypad(s2,4)
+        
+    s1 += s2
+    
+    # add lens string
+    s2 = hex(lens).lstrip('0x').upper()
+
+    # padding
+    s2 = mypad(s2,2)
+    
+    s1 += s2
+
+    # add data string
+    s2 = hex(dat).lstrip('0x').upper()
+    s2 = mypad(s2,2*lens)
+    s1 += s2    
+
+    # add tail
+    s3 = '\x03'
+    s1 += s3
+
+    # checksum    
+    d5 = 0
+    for d in s1[1:]:
+        d5 += ord(d)
+    d5 = (d5) % 256
+    
+    # convert checksum to ascii string
+    s4 = hex(d5).lstrip('0x').upper()
+   
+    s4 = mypad(s4,2)
+    
+    s1 += s4
+    if debug == 1:
+        print 's1 hex:',s1.encode('hex')    
+
+    return 0,s1
+
+
+#-------------------------------
+# encode_device_force_pkg
+#   offset: PLC data offset
+#   flag: 1 -- on, 0 -- off
+#   debug: debug flag
+#------------------------------- 
+def encode_device_write_pkg(offset,flag,debug = 0):
+    if offset > 65535:
+        return -1,''
+    if lens > 64:
+        return -2,''
+       
+    if flag == 1:   
+        s1 = '\x02\x37'
+    else:
+        s1 = '\x02\x38'
+    
+    # add offset string
+    s2 = hex(offset).lstrip('0x').upper()
+    
+    # padding
+    s2 = mypad(s2,4)        
+    s1 += s2
+
+    # add tail
+    s3 = '\x03'
+    s1 += s3
+
+    # checksum    
+    d5 = 0
+    for d in s1[1:]:
+        d5 += ord(d)
+    d5 = (d5) % 256
+    
+    # convert checksum to ascii string
+    s4 = hex(d5).lstrip('0x').upper()
+   
+    s4 = mypad(s4,2)
+    
+    s1 += s4
+    if debug == 1:
+        print 's1 hex:',s1.encode('hex')    
+
+    return 0,s1
+
+
 #-------------------------
 # hex2int
 #-------------------------     
@@ -101,6 +215,19 @@ def decode_device_read_pkg(dat,debug = 0):
             print 'error, decoded data hex:',dat.encode('hex')
         return -1,''
 
+#-------------------------
+# check_response_pkg
+# pair with write
+#------------------------- 
+def check_response_pkg(dat):
+    if len(dat) == 1 and dat == '\x06':
+        return 0
+        
+    elif len(dat) == 1 and dat == '\x15':
+        return -1
+    else:
+        return -2
+        
 
 #-------------------------
 # main
@@ -112,7 +239,7 @@ if __name__ == '__main__':
     if 1:
         serialport_path = sys.argv[1]
         print 'COM port:', serialport_path
-        s = serial.Serial(serialport_path, baudrate=9600, bytesize=8,parity=serial.PARITY_NONE,stopbits=1,timeout=0.1,xonxoff=0, rtscts=0)
+        s = serial.Serial(serialport_path, baudrate=9600, bytesize=8,parity=serial.PARITY_EVEN,stopbits=1,timeout=0.1,xonxoff=0, rtscts=0)
         #print s
         print 'start to test...'
 
