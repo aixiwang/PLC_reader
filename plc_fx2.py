@@ -26,20 +26,15 @@ def encode_device_read_pkg(offset,lens,debug = 0):
        
     s1 = '\x02\x30'
     
+    #print('offset:',offset,' lens:',lens)
     # add offset string
     s2 = hex(offset).lstrip('0x').upper()
+    #print('s2:',s2)
 
-    if len(s2) == 1:
-        s2 = '000' + s2
-        
-    if len(s2) == 2:
-        s2 = '00' + s2
-
-    if len(s2) == 3:
-        s2 = '0' + s2
-        
+    s2 = mypad(s2,4)    
     s1 += s2
     
+    #print('s1:',s1)
     # add lens string
     s2 = hex(lens).lstrip('0x').upper()
     if len(s2) == 1:
@@ -49,7 +44,7 @@ def encode_device_read_pkg(offset,lens,debug = 0):
     
     s3 = '\x03'
     s1 += s3
-    
+    #print('s1:',s1)
     d5 = 0
     for d in s1[1:]:
         d5 += ord(d)
@@ -58,9 +53,11 @@ def encode_device_read_pkg(offset,lens,debug = 0):
     # convert checksum to ascii string
     s4 = hex(d5).lstrip('0x').upper()
 
-    if len(s4) == 1:
-        s4 = '0' + s4
+    s4 = mypad(s4,2)
+    
     s1 += s4
+    
+    #print('s1:',s1)
     if debug == 1:
         print 's1 hex:',s1.encode('hex')    
 
@@ -107,7 +104,9 @@ def encode_device_write_pkg(offset,lens,dat,debug = 0):
     s1 += s2
 
     # add data string
-    s2 = hex(dat).lstrip('0x').upper()
+    print('dat:',dat)
+    #s2 = hex(dat).lstrip('0x').upper()
+    s2 = dat.encode('hex').upper()
     s2 = mypad(s2,2*lens)
     s1 += s2    
 
@@ -139,11 +138,10 @@ def encode_device_write_pkg(offset,lens,dat,debug = 0):
 #   flag: 1 -- on, 0 -- off
 #   debug: debug flag
 #------------------------------- 
-def encode_device_write_pkg(offset,flag,debug = 0):
+def encode_device_force_pkg(offset,flag,debug = 0):
     if offset > 65535:
         return -1,''
-    if lens > 64:
-        return -2,''
+
        
     if flag == 1:   
         s1 = '\x02\x37'
@@ -230,6 +228,17 @@ def check_response_pkg(dat):
         
 
 #-------------------------
+# check_online
+#-------------------------        
+def check_online(s):
+    s.write('\x05');
+    dat = s.read(1)
+    if check_response_pkg(dat) == 0:
+        return True
+    else:
+        return False
+            
+#-------------------------
 # main
 #-------------------------
 if __name__ == '__main__':
@@ -242,28 +251,84 @@ if __name__ == '__main__':
         s = serial.Serial(serialport_path, baudrate=9600, bytesize=7,parity=serial.PARITY_EVEN,stopbits=1,timeout=0.1,xonxoff=0, rtscts=0)
         #print s
         print 'start to test...'
+        
+        off = 0x00
+        i = 0
+        while True:
+            print('online:',check_online(s))
+            
+            if 1:
+                # write test
+                print('---------------------------------')
+                print('write test ...')
+                retcode,encoded_tx = encode_device_write_pkg(off,4,'\x55\x66\x77' + chr(i))
+                #off += 1
+                s.write(encoded_tx)
+                time.sleep(0.1)
+                encoded_rx = s.read(1024)
+                print '<======== encoded_rx(hex):',encoded_rx.encode('hex')
+            
+            if 1:
+                # read test
+                print('---------------------------------')            
+                print('read test ...')
+                retcode,encoded_tx = encode_device_read_pkg(off,4)
+                #off += 1
+                print '>======== encoded_tx(hex):',encoded_tx.encode('hex')
+                s.write(encoded_tx)
+                time.sleep(0.1)
+                encoded_rx = s.read(1024)
+                print '<======== encoded_rx(hex):',encoded_rx.encode('hex')
+                # test decode
+                # 02 33 35 38 34 03 44 36
+                #s = '\x02\x33\x35\x38\x34\x03\x44\x36'
+                if retcode == 0:
+                    retcode, return_bytes = decode_device_read_pkg(encoded_rx)
+                    if retcode == 0:
+                        # do something
+                        print 'read test ok =>',return_bytes.encode('hex')
+                    else:
+                        print 'read test fail.','recode:',retcode,'return bytes:',return_bytes.encode('hex')
+                else:
+                    print 'read failed'
+                    
 
-        off = 0x080
-        while True:        
-            # d123
-            retcode,encoded_tx = encode_device_read_pkg(off,2,1)
-            #off += 1
-            s.write(encoded_tx)
-            time.sleep(0.1)
-            encoded_rx = s.read(1024)
-            print '<======== encoded_rx(hex):',encoded_rx.encode('hex')
-            # test decode
-            # 02 33 35 38 34 03 44 36
-            #s = '\x02\x33\x35\x38\x34\x03\x44\x36'
-            if retcode == 0:
-                retcode, return_bytes = decode_device_read_pkg(encoded_rx)
+            if 0:    
+                print('---------------------------------')
+                print('force on test ...')
+                retcode,encoded_tx = encode_device_force_pkg(off,1)
+                #off += 1
+                s.write(encoded_tx)
+                time.sleep(0.1)
+                encoded_rx = s.read(1024)
+                print '<======== encoded_rx(hex):',encoded_rx.encode('hex')
+                retcode = check_response_pkg(encoded_rx)
                 if retcode == 0:
                     # do something
-                    print 'read test ok =>',return_bytes.encode('hex')
+                    print 'force on test ok =>'
                 else:
-                    print 'read test fail.','recode:',retcode,'return bytes:',return_bytes.encode('hex')
-            else:
-                print 'read failed'
+                    print 'force on test fail.'
+
+            if 0:                    
+                print('---------------------------------')                
+                print('force off test ...')
+                retcode,encoded_tx = encode_device_force_pkg(off,0)
+                #off += 1
+                s.write(encoded_tx)
+                time.sleep(0.1)
+                encoded_rx = s.read(1024)
+                print '<======== encoded_rx(hex):',encoded_rx.encode('hex')
+
+                retcode = check_response_pkg(encoded_rx)
+                if retcode == 0:
+                    # do something
+                    print 'force off test ok =>'
+                else:
+                    print 'for off test fail.'
+
+                
+            i += 1
+                
             time.sleep(1)
         
     #except:
