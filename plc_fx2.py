@@ -239,7 +239,7 @@ if __name__ == '__main__':
     if 1:
         serialport_path = sys.argv[1]
         print 'COM port:', serialport_path
-        s = serial.Serial(serialport_path, baudrate=9600, bytesize=8,parity=serial.PARITY_EVEN,stopbits=1,timeout=0.1,xonxoff=0, rtscts=0)
+        s = serial.Serial(serialport_path, baudrate=9600, bytesize=7,parity=serial.PARITY_EVEN,stopbits=1,timeout=0.1,xonxoff=0, rtscts=0)
         #print s
         print 'start to test...'
 
